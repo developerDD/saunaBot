@@ -77,7 +77,7 @@ async def calculate_expenses(message: types.Message):
     await message.answer(result)
 
 async def main():
-    dp.include_router(dp.router)
+    dp.startup.register(start)  # Реєструємо стартову команду
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
