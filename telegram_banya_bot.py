@@ -77,8 +77,8 @@ async def add_expense_menu(message: types.Message, state: FSMContext):
     )
     await message.answer("Виберіть, хто зробив витрати:", reply_markup=keyboard)
     await state.set_state(BathSession.selecting_expense_user)
-    # Обробник вибору користувача для витрат
-@dp.callback_query(F.data.startswith("expense_"))
+
+@dp.callback_query(F.data.startswith("expense_"), BathSession.selecting_expense_user)
 async def select_expense_type(callback: types.CallbackQuery, state: FSMContext):
     user = callback.data.replace("expense_", "")
     await state.update_data(expense_user=user)
@@ -92,7 +92,6 @@ async def select_expense_type(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(f"Виберіть тип витрат для {user}:", reply_markup=keyboard)
     await state.set_state(BathSession.selecting_expense_type)
 
-# Обробник вибору типу витрат
 @dp.callback_query(F.data.startswith("expense_"), BathSession.selecting_expense_type)
 async def enter_expense_amount(callback: types.CallbackQuery, state: FSMContext):
     expense_type = callback.data.replace("expense_", "")
@@ -101,7 +100,6 @@ async def enter_expense_amount(callback: types.CallbackQuery, state: FSMContext)
     await callback.message.answer("Введіть суму витрат (тільки число):")
     await state.set_state(BathSession.entering_expense_amount)
 
-# Обробник введення суми витрат
 @dp.message(BathSession.entering_expense_amount, F.text.regexp(r'\d+'))
 async def save_expense(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -116,6 +114,7 @@ async def save_expense(message: types.Message, state: FSMContext):
     
     await message.answer(f"✅ Витрати для {user} записані: {amount} грн на {('🍗 Їжа' if expense_type == 'food' else '🍾 Алкоголь')}", reply_markup=main_menu)
     await state.clear()
+
 
 
 
