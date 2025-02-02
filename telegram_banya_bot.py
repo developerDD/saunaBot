@@ -14,16 +14,20 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
+# Головне меню
+main_menu = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="➕ Додати користувача")],
+        [KeyboardButton(text="❌ Видалити користувача")],
+        [KeyboardButton(text="💰 Додати витрати")],
+        [KeyboardButton(text="📊 Розрахувати витрати")]
+    ],
+    resize_keyboard=True
+)
+
 # Тимчасове сховище користувачів та витрат (замінити на Google Sheets/БД)
 users = {}
 expenses = []
-
-# Головне меню
-main_menu = ReplyKeyboardMarkup(resize_keyboard=True)
-main_menu.add(KeyboardButton("➕ Додати користувача"))
-main_menu.add(KeyboardButton("❌ Видалити користувача"))
-main_menu.add(KeyboardButton("💰 Додати витрати"))
-main_menu.add(KeyboardButton("📊 Розрахувати витрати"))
 
 @dp.message(commands=['start'])
 async def start(message: types.Message):
