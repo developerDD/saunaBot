@@ -64,37 +64,33 @@ async def add_expense_menu(message: types.Message, state: FSMContext):
     await message.answer("Оберіть категорію витрат:", reply_markup=keyboard)
     await state.set_state(BathSession.selecting_expense_type)
 
-@dp.message(F.text == "🍗 Додати витрати на їжу", state=BathSession.selecting_expense_type)
+@dp.message(F.text == "🍗 Додати витрати на їжу")
 async def ask_food_expense(message: types.Message, state: FSMContext):
     await message.answer("Введіть витрати на їжу (тільки число):")
     await state.set_state(BathSession.entering_food_expense)
 
-@dp.message(F.text == "🍾 Додати витрати на алкоголь", state=BathSession.selecting_expense_type)
+@dp.message(F.text == "🍾 Додати витрати на алкоголь")
 async def ask_alcohol_expense(message: types.Message, state: FSMContext):
     await message.answer("Введіть витрати на алкоголь (тільки число):")
     await state.set_state(BathSession.entering_alcohol_expense)
 
-@dp.message(F.text == "🔥 Додати вартість бані", state=BathSession.selecting_expense_type)
+@dp.message(F.text == "🔥 Додати вартість бані")
 async def ask_bath_cost(message: types.Message, state: FSMContext):
     await message.answer("Введіть загальну вартість бані (тільки число):")
     await state.set_state(BathSession.entering_bath_cost)
 
-@dp.message(F.text.regexp(r'\d+'), state=BathSession.entering_food_expense)
-async def save_food_expense(message: types.Message, state: FSMContext):
-    expenses["food"] = int(message.text)
-    await message.answer("✅ Витрати на їжу збережені!", reply_markup=main_menu)
-    await state.clear()
-
-@dp.message(F.text.regexp(r'\d+'), state=BathSession.entering_alcohol_expense)
-async def save_alcohol_expense(message: types.Message, state: FSMContext):
-    expenses["alcohol"] = int(message.text)
-    await message.answer("✅ Витрати на алкоголь збережені!", reply_markup=main_menu)
-    await state.clear()
-
-@dp.message(F.text.regexp(r'\d+'), state=BathSession.entering_bath_cost)
-async def save_bath_cost(message: types.Message, state: FSMContext):
-    expenses["bath"] = int(message.text)
-    await message.answer("✅ Вартість бані збережена!", reply_markup=main_menu)
+@dp.message(F.text.regexp(r'\d+'))
+async def save_expenses(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state == BathSession.entering_food_expense.state:
+        expenses["food"] = int(message.text)
+        await message.answer("✅ Витрати на їжу збережені!", reply_markup=main_menu)
+    elif current_state == BathSession.entering_alcohol_expense.state:
+        expenses["alcohol"] = int(message.text)
+        await message.answer("✅ Витрати на алкоголь збережені!", reply_markup=main_menu)
+    elif current_state == BathSession.entering_bath_cost.state:
+        expenses["bath"] = int(message.text)
+        await message.answer("✅ Вартість бані збережена!", reply_markup=main_menu)
     await state.clear()
 
 async def main():
