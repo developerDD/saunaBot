@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-# Список користувачів, які відвідують баню
+# Список користувачів та їх витрати
 users = {}
 bath_visitors = []
 expenses = {}
@@ -27,10 +27,9 @@ expenses = {}
 class BathSession(StatesGroup):
     adding_user = State()
     selecting_visitors = State()
+    selecting_expense_user = State()
     selecting_expense_type = State()
-    entering_food_expense = State()
-    entering_alcohol_expense = State()
-    entering_bath_cost = State()
+    entering_expense_amount = State()
     confirming_expenses = State()
 
 # Головне меню
@@ -59,7 +58,53 @@ async def save_user(message: types.Message, state: FSMContext):
         await message.answer("⚠️ Такий користувач вже є!")
     else:
         users[user_name] = 0
+        expenses[user_name] = {"food": 0, "alcohol": 0, "bath": 0}
         await message.answer(f"✅ Користувач {user_name} доданий!", reply_markup=main_menu)
+    await state.clear()
+
+@dp.message(F.text == "💰 Додати витрати")
+async def add_expense_menu(message: types.Message, state: FSMContext):
+    if not users:
+        await message.answer("⚠️ Немає зареєстрованих користувачів!")
+        return
+    
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=name, callback_data=f"expense_{name}")] for name in users]
+    )
+    await message.answer("Виберіть, хто зробив витрати:", reply_markup=keyboard)
+    await state.set_state(BathSession.selecting_expense_user)
+
+@dp.callback_query(F.data.startswith("expense_"), BathSession.selecting_expense_user)
+async def select_expense_user(callback: types.CallbackQuery, state: FSMContext):
+    selected_user = callback.data.replace("expense_", "")
+    await state.update_data(expense_user=selected_user)
+    
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🍗 Їжа")],
+            [KeyboardButton(text="🍾 Алкоголь")],
+            [KeyboardButton(text="🔥 Баня")]
+        ],
+        resize_keyboard=True
+    )
+    await callback.message.answer(f"Виберіть категорію витрат для {selected_user}:", reply_markup=keyboard)
+    await state.set_state(BathSession.selecting_expense_type)
+
+@dp.message(F.text.in_(["🍗 Їжа", "🍾 Алкоголь", "🔥 Баня"]), BathSession.selecting_expense_type)
+async def ask_expense_amount(message: types.Message, state: FSMContext):
+    category_map = {"🍗 Їжа": "food", "🍾 Алкоголь": "alcohol", "🔥 Баня": "bath"}
+    category = category_map[message.text]
+    await state.update_data(expense_category=category)
+    await message.answer(f"Введіть суму витрат на {message.text} (тільки число):")
+    await state.set_state(BathSession.entering_expense_amount)
+
+@dp.message(F.text.regexp(r'\d+'), BathSession.entering_expense_amount)
+async def save_expense(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    user = data["expense_user"]
+    category = data["expense_category"]
+    expenses[user][category] += int(message.text)
+    await message.answer(f"✅ Витрати на {category} для {user} збережені!", reply_markup=main_menu)
     await state.clear()
 
 @dp.message(F.text == "🚿 Почати розрахунок")
@@ -75,50 +120,16 @@ async def start_calculation(message: types.Message, state: FSMContext):
     await message.answer("Виберіть, хто був у бані:", reply_markup=keyboard)
     await state.set_state(BathSession.selecting_visitors)
 
-@dp.callback_query(F.data.startswith("visitor_"), BathSession.selecting_visitors)
-async def select_visitor(callback: types.CallbackQuery, state: FSMContext):
-    visitor_name = callback.data.replace("visitor_", "")
-    if visitor_name in bath_visitors:
-        bath_visitors.remove(visitor_name)
-    else:
-        bath_visitors.append(visitor_name)
-    
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=name + (" ✅" if name in bath_visitors else ""), callback_data=f"visitor_{name}")] for name in users] +
-                        [[InlineKeyboardButton(text="✅ Далі", callback_data="next")]]
-    )
-    await callback.message.edit_text("Виберіть, хто був у бані:", reply_markup=keyboard)
-
 @dp.callback_query(F.data == "next", BathSession.selecting_visitors)
-async def ask_expenses(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.answer("Введіть витрати на їжу (тільки число):")
-    await state.set_state(BathSession.entering_food_expense)
-
-@dp.message(F.text.regexp(r'\d+'), BathSession.entering_food_expense)
-async def save_food_expense(message: types.Message, state: FSMContext):
-    expenses["food"] = int(message.text)
-    await message.answer("Введіть витрати на алкоголь (тільки число):")
-    await state.set_state(BathSession.entering_alcohol_expense)
-
-@dp.message(F.text.regexp(r'\d+'), BathSession.entering_alcohol_expense)
-async def save_alcohol_expense(message: types.Message, state: FSMContext):
-    expenses["alcohol"] = int(message.text)
-    await message.answer("Введіть загальну вартість бані (тільки число):")
-    await state.set_state(BathSession.entering_bath_cost)
-
-@dp.message(F.text.regexp(r'\d+'), BathSession.entering_bath_cost)
-async def finalize_calculation(message: types.Message, state: FSMContext):
-    expenses["bath"] = int(message.text)
-    total_cost = sum(expenses.values())
-    per_person = total_cost / len(bath_visitors) if bath_visitors else 0
+async def finalize_calculation(callback: types.CallbackQuery, state: FSMContext):
+    total_costs = {user: sum(expenses[user].values()) for user in bath_visitors}
+    per_person = {user: total_costs[user] / len(bath_visitors) for user in bath_visitors}
     
-    result = (f"💰 Загальні витрати: {total_cost} грн\n"
-              f"🍗 Їжа: {expenses['food']} грн\n"
-              f"🍾 Алкоголь: {expenses['alcohol']} грн\n"
-              f"🔥 Баня: {expenses['bath']} грн\n"
-              f"💳 Кожен відвідувач має заплатити: {per_person:.2f} грн")
+    result = "💰 **Підсумок витрат:**\n"
+    for user, total in total_costs.items():
+        result += f"👤 {user}: {total} грн (має заплатити {per_person[user]:.2f} грн)\n"
     
-    await message.answer(result, reply_markup=main_menu)
+    await callback.message.answer(result, reply_markup=main_menu)
     await state.clear()
 
 async def main():
