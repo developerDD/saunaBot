@@ -2,6 +2,7 @@ import logging
 import asyncio
 import os
 from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 # Отримуємо API-токен з змінних середовища
@@ -29,7 +30,7 @@ main_menu = ReplyKeyboardMarkup(
 users = {}
 expenses = []
 
-@dp.message(commands=['start'])
+@dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer("Привіт! Я бот для розрахунку витрат на баню. Вибери дію:", reply_markup=main_menu)
 
