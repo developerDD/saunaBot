@@ -52,6 +52,28 @@ main_menu = ReplyKeyboardMarkup(
 async def start(message: types.Message):
     await message.answer("Привіт! Я бот для розрахунку витрат на баню. Вибери дію:", reply_markup=main_menu)
 
+@dp.message(F.text == "➕ Додати користувача")
+async def add_user(message: types.Message, state: FSMContext):
+    await message.answer("Введіть ім'я користувача:")
+    await state.set_state(BathSession.adding_user)
+
+@dp.message(F.text == "💰 Додати витрати")
+async def add_expense_menu(message: types.Message, state: FSMContext):
+    if not bath_visitors:
+        await message.answer("⚠️ Спочатку потрібно вибрати, хто був у бані!")
+        return
+    
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=name, callback_data=f"expense_{name}")] for name in bath_visitors]
+    )
+    await message.answer("Виберіть, хто зробив витрати:", reply_markup=keyboard)
+    await state.set_state(BathSession.selecting_expense_user)
+
+@dp.message(F.text == "🔥 Вказати вартість бані")
+async def set_bath_cost(message: types.Message, state: FSMContext):
+    await message.answer("Введіть загальну вартість бані (тільки число):")
+    await state.set_state(BathSession.entering_bath_cost)
+
 @dp.message(F.text == "🍾 Вказати хто пив алкоголь")
 async def select_alcohol_drinkers(message: types.Message, state: FSMContext):
     if not bath_visitors:
