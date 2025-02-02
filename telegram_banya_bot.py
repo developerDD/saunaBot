@@ -26,6 +26,7 @@ expenses = {}
 
 class BathSession(StatesGroup):
     selecting_visitors = State()
+    selecting_expense_type = State()
     entering_food_expense = State()
     entering_alcohol_expense = State()
     entering_bath_cost = State()
@@ -34,7 +35,8 @@ class BathSession(StatesGroup):
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="➕ Додати користувача")],
-        [KeyboardButton(text="🚿 Почати розрахунок")]
+        [KeyboardButton(text="🚿 Почати розрахунок")],
+        [KeyboardButton(text="💰 Додати витрати")]
     ],
     resize_keyboard=True
 )
@@ -48,67 +50,51 @@ async def add_user(message: types.Message, state: FSMContext):
     await message.answer("Введіть ім'я користувача:")
     await state.set_state(BathSession.selecting_visitors)
 
-@dp.message(F.text & ~F.text.startswith("/"))
-async def save_user(message: types.Message, state: FSMContext):
-    users[message.text] = 0
-    await message.answer(f"✅ Користувач {message.text} доданий!", reply_markup=main_menu)
-    await state.clear()
-
-@dp.message(F.text == "🚿 Почати розрахунок")
-async def start_calculation(message: types.Message, state: FSMContext):
-    if not users:
-        await message.answer("⚠️ Немає зареєстрованих користувачів!")
-        return
-    
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=name, callback_data=f"visitor_{name}")] for name in users]
+@dp.message(F.text == "💰 Додати витрати")
+async def add_expense_menu(message: types.Message, state: FSMContext):
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🍗 Додати витрати на їжу")],
+            [KeyboardButton(text="🍾 Додати витрати на алкоголь")],
+            [KeyboardButton(text="🔥 Додати вартість бані")],
+            [KeyboardButton(text="🔙 Назад")]
+        ],
+        resize_keyboard=True
     )
-    await message.answer("Виберіть, хто був у бані:", reply_markup=keyboard)
-    await state.set_state(BathSession.selecting_visitors)
+    await message.answer("Оберіть категорію витрат:", reply_markup=keyboard)
+    await state.set_state(BathSession.selecting_expense_type)
 
-@dp.callback_query(F.data.startswith("visitor_"))
-async def select_visitor(callback: types.CallbackQuery, state: FSMContext):
-    visitor_name = callback.data.replace("visitor_", "")
-    if visitor_name in bath_visitors:
-        bath_visitors.remove(visitor_name)
-    else:
-        bath_visitors.append(visitor_name)
-    
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=name + (" ✅" if name in bath_visitors else ""), callback_data=f"visitor_{name}")] for name in users]
-    )
-    await callback.message.edit_text("Виберіть, хто був у бані:", reply_markup=keyboard)
-
-@dp.message(F.text == "Далі")
+@dp.message(F.text == "🍗 Додати витрати на їжу", state=BathSession.selecting_expense_type)
 async def ask_food_expense(message: types.Message, state: FSMContext):
     await message.answer("Введіть витрати на їжу (тільки число):")
     await state.set_state(BathSession.entering_food_expense)
 
-@dp.message(F.text.regexp(r'\d+'))
-async def save_food_expense(message: types.Message, state: FSMContext):
-    expenses["food"] = int(message.text)
+@dp.message(F.text == "🍾 Додати витрати на алкоголь", state=BathSession.selecting_expense_type)
+async def ask_alcohol_expense(message: types.Message, state: FSMContext):
     await message.answer("Введіть витрати на алкоголь (тільки число):")
     await state.set_state(BathSession.entering_alcohol_expense)
 
-@dp.message(F.text.regexp(r'\d+'))
-async def save_alcohol_expense(message: types.Message, state: FSMContext):
-    expenses["alcohol"] = int(message.text)
+@dp.message(F.text == "🔥 Додати вартість бані", state=BathSession.selecting_expense_type)
+async def ask_bath_cost(message: types.Message, state: FSMContext):
     await message.answer("Введіть загальну вартість бані (тільки число):")
     await state.set_state(BathSession.entering_bath_cost)
 
-@dp.message(F.text.regexp(r'\d+'))
-async def finalize_calculation(message: types.Message, state: FSMContext):
+@dp.message(F.text.regexp(r'\d+'), state=BathSession.entering_food_expense)
+async def save_food_expense(message: types.Message, state: FSMContext):
+    expenses["food"] = int(message.text)
+    await message.answer("✅ Витрати на їжу збережені!", reply_markup=main_menu)
+    await state.clear()
+
+@dp.message(F.text.regexp(r'\d+'), state=BathSession.entering_alcohol_expense)
+async def save_alcohol_expense(message: types.Message, state: FSMContext):
+    expenses["alcohol"] = int(message.text)
+    await message.answer("✅ Витрати на алкоголь збережені!", reply_markup=main_menu)
+    await state.clear()
+
+@dp.message(F.text.regexp(r'\d+'), state=BathSession.entering_bath_cost)
+async def save_bath_cost(message: types.Message, state: FSMContext):
     expenses["bath"] = int(message.text)
-    total_cost = sum(expenses.values())
-    per_person = total_cost / len(bath_visitors)
-    
-    result = (f"💰 Загальні витрати: {total_cost} грн\n"
-              f"🍗 Їжа: {expenses['food']} грн\n"
-              f"🍾 Алкоголь: {expenses['alcohol']} грн\n"
-              f"🔥 Баня: {expenses['bath']} грн\n"
-              f"💳 Кожен відвідувач має заплатити: {per_person:.2f} грн")
-    
-    await message.answer(result, reply_markup=main_menu)
+    await message.answer("✅ Вартість бані збережена!", reply_markup=main_menu)
     await state.clear()
 
 async def main():
