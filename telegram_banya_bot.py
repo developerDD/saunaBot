@@ -69,7 +69,7 @@ async def calculate_expenses(message: types.Message):
     food = sum(exp["amount"] for exp in expenses if exp["category"] == "їжа")
     alcohol = sum(exp["amount"] for exp in expenses if exp["category"] == "алкоголь")
     bath = sum(exp["amount"] for exp in expenses if exp["category"] == "баня")
-    
+
     result = (f"💰 Загальні витрати: {total} грн\n"
               f"🍗 Їжа: {food} грн\n"
               f"🍾 Алкоголь: {alcohol} грн\n"
@@ -77,7 +77,6 @@ async def calculate_expenses(message: types.Message):
     await message.answer(result)
 
 async def main():
-    dp.startup.register(start)  # Реєструємо стартову команду
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
