@@ -36,10 +36,12 @@ class BathSession(StatesGroup):
     entering_bath_cost = State()
     confirming_expenses = State()
 
+
 # Головне меню
 main_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="➕ Додати користувача")],
+        [KeyboardButton(text="🧖‍♂️ Вибрати хто був у бані")],
         [KeyboardButton(text="💰 Додати витрати")],
         [KeyboardButton(text="🔥 Вказати вартість бані")],
         [KeyboardButton(text="🍾 Вказати хто пив алкоголь")],
@@ -60,10 +62,40 @@ async def add_user(message: types.Message, state: FSMContext):
 @dp.message(BathSession.adding_user)
 async def save_user(message: types.Message, state: FSMContext):
     users[message.text] = message.text
-    bath_visitors.append(message.text)  # Додаємо користувача до списку відвідувачів бані
+   
     await message.answer(f"✅ Користувач {message.text} доданий!", reply_markup=main_menu)
     await state.clear()
 
+@dp.message(F.text == "🧖‍♂️ Вибрати хто був у бані")
+async def select_bath_visitors(message: types.Message, state: FSMContext):
+    if not users:
+        await message.answer("⚠️ Спочатку додайте користувачів!")
+        return
+    
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=name, callback_data=f"visitor_{name}")] for name in users] +
+                        [[InlineKeyboardButton(text="✅ Готово", callback_data="finalize_visitors")]]
+    )
+    await message.answer("Виберіть, хто був у бані:", reply_markup=keyboard)
+    await state.set_state(BathSession.selecting_visitors)
+
+@dp.callback_query(F.data.startswith("visitor_"), BathSession.selecting_visitors)
+async def toggle_bath_visitor(callback: types.CallbackQuery):
+    user = callback.data.replace("visitor_", "")
+    if user in bath_visitors:
+        bath_visitors.remove(user)
+    else:
+        bath_visitors.append(user)
+    await callback.answer(f"✅ {user} {'доданий' if user in bath_visitors else 'видалений'} зі списку відвідувачів бані.")
+
+@dp.callback_query(F.data == "finalize_visitors", BathSession.selecting_visitors)
+async def finalize_bath_visitors(callback: types.CallbackQuery, state: FSMContext):
+    if not bath_visitors:
+        await callback.message.answer("⚠️ Ви не вибрали жодного відвідувача!")
+        return
+    
+    await callback.message.answer("✅ Список відвідувачів бані збережено!", reply_markup=main_menu)
+    await state.clear()
 
 
 @dp.message(F.text == "💰 Додати витрати")
