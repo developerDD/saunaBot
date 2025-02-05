@@ -208,8 +208,8 @@ async def finalize_calculation(message: types.Message):
         await message.answer("⚠️ Вкажіть вартість бані перед розрахунком!")
         return
     
-    total_food = sum(expenses[user]['food'] for user in bath_visitors if user in expenses)
-    total_alcohol = sum(expenses[user]['alcohol'] for user in alcohol_drinkers if user in expenses)
+    total_food = sum(expenses[user].get("food", 0) for user in bath_visitors if user in expenses)
+    total_alcohol = sum(expenses[user].get("alcohol", 0) for user in alcohol_drinkers if user in expenses)
     per_person_bath = bath_cost / len(bath_visitors) if bath_visitors else 0
     per_person_food = total_food / len(bath_visitors) if bath_visitors else 0
     per_person_alcohol = total_alcohol / len(alcohol_drinkers) if alcohol_drinkers else 0
@@ -222,12 +222,12 @@ async def finalize_calculation(message: types.Message):
     result += f"🔥 Баня: {bath_cost} грн\n\n"
     
     for user in bath_visitors:
-        paid = sum(expenses[user].values()) if user in expenses else 0
+        paid = sum(expenses.get(user, {}).values())  # Якщо користувач відсутній – сума 0
         owes = per_person_bath + per_person_food - paid
         if user in alcohol_drinkers:
             owes += per_person_alcohol
-        food_spent = expenses[user].get("food", 0)
-        alcohol_spent = expenses[user].get("alcohol", 0)
+        food_spent = expenses.get(user, {}).get("food", 0)
+        alcohol_spent = expenses.get(user, {}).get("alcohol", 0)
         result += (f"👤 {user}: Витратив {paid} грн (🍗 {food_spent} грн, 🍾 {alcohol_spent} грн). "
                    f"Має сплатити: {owes:+.2f} грн\n")
     
