@@ -68,6 +68,13 @@ async def save_user(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "🧖‍♂️ Вибрати хто був у бані")
 async def select_bath_visitors(message: types.Message, state: FSMContext):
+    global expenses, bath_cost, alcohol_drinkers
+    
+    # Очищення фінансових даних
+    expenses = {}
+    bath_cost = 0
+    alcohol_drinkers = []
+    
     if not users:
         await message.answer("⚠️ Спочатку додайте користувачів!")
         return
@@ -76,7 +83,7 @@ async def select_bath_visitors(message: types.Message, state: FSMContext):
         inline_keyboard=[[InlineKeyboardButton(text=name, callback_data=f"visitor_{name}")] for name in users] +
                         [[InlineKeyboardButton(text="✅ Готово", callback_data="finalize_visitors")]]
     )
-    await message.answer("Виберіть, хто був у бані:", reply_markup=keyboard)
+    await message.answer("Виберіть, хто був у бані (всі фінансові дані очищені):", reply_markup=keyboard)
     await state.set_state(BathSession.selecting_visitors)
 
 @dp.callback_query(F.data.startswith("visitor_"), BathSession.selecting_visitors)
@@ -94,9 +101,8 @@ async def finalize_bath_visitors(callback: types.CallbackQuery, state: FSMContex
         await callback.message.answer("⚠️ Ви не вибрали жодного відвідувача!")
         return
     
-    await callback.message.answer("✅ Список відвідувачів бані збережено!", reply_markup=main_menu)
+    await callback.message.answer("✅ Список відвідувачів бані збережено! Всі витрати обнулені.", reply_markup=main_menu)
     await state.clear()
-
 
 @dp.message(F.text == "💰 Додати витрати")
 async def add_expense_menu(message: types.Message, state: FSMContext):
